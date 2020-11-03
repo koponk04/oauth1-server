@@ -2,13 +2,11 @@
 namespace JoakimKejser\OAuth;
 
 /**
- * Interface ConsumerInterface
- * @package JoakimKejser\OAuth
+ * Interface ConsumerInterface.
  */
 interface ConsumerInterface
 {
+	public function getKey();
 
-    public function getKey();
-
-    public function getSecret();
+	public function getSecret();
 }

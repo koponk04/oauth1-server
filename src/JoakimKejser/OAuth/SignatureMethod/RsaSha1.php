@@ -1,14 +1,12 @@
 <?php
 namespace JoakimKejser\OAuth\SignatureMethod;
 
-use JoakimKejser\OAuth\ConsumerInterface;
-use JoakimKejser\OAuth\OAuthUtil;
-use JoakimKejser\OAuth\SignatureMethod;
-use JoakimKejser\OAuth\OauthRequest;
 use JoakimKejser\OAuth\Consumer;
+use JoakimKejser\OAuth\ConsumerInterface;
+use JoakimKejser\OAuth\OauthRequest;
+use JoakimKejser\OAuth\SignatureMethod;
 use JoakimKejser\OAuth\Token;
 use JoakimKejser\OAuth\TokenInterface;
-use JoakimKejser\OAuth\Util;
 
 /**
  * The RSA-SHA1 signature method uses the RSASSA-PKCS1-v1_5 signature algorithm as defined in
@@ -16,88 +14,95 @@ use JoakimKejser\OAuth\Util;
  * EMSA-PKCS1-v1_5. It is assumed that the Consumer has provided its RSA public key in a
  * verified way to the Service Provider, in a manner which is beyond the scope of this
  * specification.
- *   - Chapter 9.3 ("RSA-SHA1")
+ *   - Chapter 9.3 ("RSA-SHA1").
  */
 abstract class RsaSha1 extends SignatureMethod
 {
-    /**
-     * @return string
-     */
-    public function getName()
-    {
-        return "RSA-SHA1";
-    }
+	/**
+	 * @return string
+	 */
+	public function getName()
+	{
+		return 'RSA-SHA1';
+	}
 
-    // Up to the SP to implement this lookup of keys. Possible ideas are:
-    // (1) do a lookup in a table of trusted certs keyed off of consumer
-    // (2) fetch via http using a url provided by the requester
-    // (3) some sort of specific discovery code based on request
-    //
-    // Either way should return a string representation of the certificate
-    abstract protected function fetchPublicCert(OauthRequest &$request);
+	/**
+	 * @param OauthRequest      $request
+	 * @param ConsumerInterface $consumer
+	 * @param TokenInterface    $token
+	 *
+	 * @return string
+	 */
+	public function buildSignature(OauthRequest $request, ConsumerInterface $consumer, TokenInterface $token = null)
+	{
+		unset($consumer, $token);
 
-    // Up to the SP to implement this lookup of keys. Possible ideas are:
-    // (1) do a lookup in a table of trusted certs keyed off of consumer
-    //
-    // Either way should return a string representation of the certificate
-    abstract protected function fetchPrivateCert(OauthRequest &$request);
+		$baseString = $request->getSignatureBaseString();
+		$request->setBaseString($baseString);
 
+		// Fetch the private key cert based on the request
+		$cert = $this->fetchPrivateCert($request);
 
-    /**
-     * @param OauthRequest $request
-     * @param ConsumerInterface $consumer
-     * @param TokenInterface $token
-     * @return string
-     */
-    public function buildSignature(OauthRequest $request, ConsumerInterface $consumer, TokenInterface $token = null)
-    {
-        $baseString = $request->getSignatureBaseString();
-        $request->setBaseString($baseString);
+		// Pull the private key ID from the certificate
+		$privateKeyID = openssl_get_privatekey($cert);
 
-        // Fetch the private key cert based on the request
-        $cert = $this->fetchPrivateCert($request);
+		// Sign using the key
+		$ok = openssl_sign($baseString, $signature, $privateKeyID);
 
-        // Pull the private key ID from the certificate
-        $privateKeyID = openssl_get_privatekey($cert);
+		// Release the key resource
+		openssl_free_key($privateKeyID);
 
-        // Sign using the key
-        $ok = openssl_sign($baseString, $signature, $privateKeyID);
+		$encodedSignature = base64_encode($signature);
 
-        // Release the key resource
-        openssl_free_key($privateKeyID);
+		return $encodedSignature;
+	}
 
-        return base64_encode($signature);
-    }
+	/**
+	 * @param string            $signature
+	 * @param OauthRequest      $request
+	 * @param ConsumerInterface $consumer
+	 * @param TokenInterface    $token
+	 *
+	 * @return bool
+	 */
+	public function checkSignature(
+		$signature,
+		OauthRequest $request,
+		ConsumerInterface $consumer,
+		TokenInterface $token = null
+	) {
+		unset($consumer, $token);
 
-    /**
-     * @param String $signature
-     * @param OauthRequest $request
-     * @param ConsumerInterface $consumer
-     * @param TokenInterface $token
-     * @return bool
-     */
-    public function checkSignature(
-        $signature,
-        OauthRequest $request,
-        ConsumerInterface $consumer,
-        TokenInterface $token = null
-    ) {
-        $decodedSig = base64_decode($signature);
+		$decodedSig = base64_decode($signature);
 
-        $baseString = $request->getSignatureBaseString();
+		$baseString = $request->getSignatureBaseString();
 
-        // Fetch the public key cert based on the request
-        $cert = $this->fetchPublicCert($request);
+		// Fetch the public key cert based on the request
+		$cert = $this->fetchPublicCert($request);
 
-        // Pull the public key ID from the certificate
-        $publicKeyID = openssl_get_publickey($cert);
+		// Pull the public key ID from the certificate
+		$publicKeyID = openssl_get_publickey($cert);
 
-        // Check the computed signature against the one passed in the query
-        $ok = openssl_verify($baseString, $decodedSig, $publicKeyID);
+		// Check the computed signature against the one passed in the query
+		$ok = openssl_verify($baseString, $decodedSig, $publicKeyID);
 
-        // Release the key resource
-        openssl_free_key($publicKeyID);
+		// Release the key resource
+		openssl_free_key($publicKeyID);
 
-        return $ok == 1;
-    }
+		return 1 == $ok;
+	}
+
+	// Up to the SP to implement this lookup of keys. Possible ideas are:
+	// (1) do a lookup in a table of trusted certs keyed off of consumer
+	// (2) fetch via http using a url provided by the requester
+	// (3) some sort of specific discovery code based on request
+	//
+	// Either way should return a string representation of the certificate
+	abstract protected function fetchPublicCert(OauthRequest &$request);
+
+	// Up to the SP to implement this lookup of keys. Possible ideas are:
+	// (1) do a lookup in a table of trusted certs keyed off of consumer
+	//
+	// Either way should return a string representation of the certificate
+	abstract protected function fetchPrivateCert(OauthRequest &$request);
 }

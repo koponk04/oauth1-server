@@ -2,40 +2,39 @@
 namespace JoakimKejser\OAuth;
 
 /**
- * Class AccessToken
- * @package JoakimKejser\OAuth
+ * Class AccessToken.
  */
 class AccessToken implements TokenInterface
 {
-    /**
-     * @var
-     */
-    protected $key;
+	/**
+	 * @var
+	 */
+	protected $key;
 
-    /**
-     * @var
-     */
-    protected $secret;
+	/**
+	 * @var
+	 */
+	protected $secret;
 
-    function __construct($key, $secret)
-    {
-        $this->key = $key;
-        $this->secret = $secret;
-    }
+	public function __construct($key, $secret)
+	{
+		$this->key = $key;
+		$this->secret = $secret;
+	}
 
-    /**
-     * @return string
-     */
-    public function getKey()
-    {
-        return $this->key;
-    }
+	/**
+	 * @return string
+	 */
+	public function getKey()
+	{
+		return $this->key;
+	}
 
-    /**
-     * @return string
-     */
-    public function getSecret()
-    {
-        return $this->secret;
-    }
+	/**
+	 * @return string
+	 */
+	public function getSecret()
+	{
+		return $this->secret;
+	}
 }

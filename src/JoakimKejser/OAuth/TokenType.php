@@ -3,19 +3,11 @@
 namespace JoakimKejser\OAuth;
 
 /**
- * Class TokenType
- * @package JoakimKejser\OAuth
+ * Class TokenType.
  */
 class TokenType
 {
-    /**
-     *
-     */
-    const REQUEST = 'request';
+	public const REQUEST = 'request';
 
-    /**
-     *
-     */
-    const ACCESS = 'access';
-
+	public const ACCESS = 'access';
 }
