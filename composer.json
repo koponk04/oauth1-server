@@ -1,5 +1,5 @@
 {
-  "name": "tonoman3g/oauth1-server",
+  "name": "koponk04/oauth1-server",
   "authors": [
     {
       "name": "Joakim Kejser",
@@ -8,6 +8,10 @@
     {
       "name": "Hartono Sulaiman",
       "email": "hartono.sulaiman@gmail.com"
+    },
+    {
+      "name": "Ardhian Heru Nugroho",
+      "email": "ardhian777@gmail.com"
     }
   ],
   "require": {
