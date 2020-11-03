@@ -19,7 +19,8 @@
     "squizlabs/php_codesniffer": "*",
     "sebastian/phpcpd": "*",
     "phpmd/phpmd": "2.7.*",
-    "mayflower/php-codebrowser": "2.*"
+    "mayflower/php-codebrowser": "2.*",
+    "phpstan/phpstan": "^0.12.53"
   },
   "autoload": {
     "psr-0": {"JoakimKejser\\OAuth": "src/"}

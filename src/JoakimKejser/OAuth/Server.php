@@ -1,12 +1,19 @@
 <?php
 namespace JoakimKejser\OAuth;
 
+use JoakimKejser\OAuth\Exeption\SignatureMethodMissingException;
+
 /**
  * Class Server
  * @package JoakimKejser\OAuth
  */
 class Server
 {
+    /**
+     * @var OauthRequest
+     */
+    private $request;
+
     /**
      * @var int seconds
      */
@@ -156,7 +163,7 @@ class Server
         if (!$signatureMethod) {
             // According to chapter 7 ("Accessing Protected Ressources") the signature-method
             // parameter is required, and we can't just fallback to PLAINTEXT
-            throw new Exception\SignatureMethodMissing();
+            throw new SignatureMethodMissingException();
         }
 
         if (!in_array($signatureMethod, array_keys($this->signatureMethods))) {

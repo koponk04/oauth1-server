@@ -8,7 +8,7 @@ use JoakimKejser\OAuth\OauthRequest;
 use JoakimKejser\OAuth\Consumer;
 use JoakimKejser\OAuth\Token;
 use JoakimKejser\OAuth\TokenInterface;
-use Joakimkejser\OAuth\Util;
+use JoakimKejser\OAuth\Util;
 
 /**
  * The HMAC-SHA1 signature method uses the HMAC-SHA1 signature algorithm as defined in [RFC2104]

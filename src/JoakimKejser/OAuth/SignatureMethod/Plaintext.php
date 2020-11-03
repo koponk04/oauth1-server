@@ -8,7 +8,7 @@ use JoakimKejser\OAuth\OauthRequest;
 use JoakimKejser\OAuth\Consumer;
 use JoakimKejser\OAuth\Token;
 use JoakimKejser\OAuth\TokenInterface;
-use Joakimkejser\OAuth\Util;
+use JoakimKejser\OAuth\Util;
 
 /**
  * The PLAINTEXT method does not provide any security protection and SHOULD only be used

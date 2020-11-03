@@ -8,7 +8,7 @@ use JoakimKejser\OAuth\OauthRequest;
 use JoakimKejser\OAuth\Consumer;
 use JoakimKejser\OAuth\Token;
 use JoakimKejser\OAuth\TokenInterface;
-use Joakimkejser\OAuth\Util;
+use JoakimKejser\OAuth\Util;
 
 /**
  * The RSA-SHA1 signature method uses the RSASSA-PKCS1-v1_5 signature algorithm as defined in
