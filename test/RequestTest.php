@@ -1,217 +1,243 @@
 <?php
 
-use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
+use JoakimKejser\OAuth\ConsumerInterface;
 use JoakimKejser\OAuth\OauthRequest;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
-class RequestTest extends PHPUNIT_Framework_TestCase
+class RequestTest extends TestCase
 {
+	public function testToStringNoParameters(): void
+	{
+		$request = new JoakimKejser\OAuth\OauthRequest('GET', 'http://localhost/index.php');
 
-    public function testToStringNoParameters()
-    {
-        $request = new JoakimKejser\OAuth\OauthRequest("GET", "http://localhost/index.php");
+		$this->assertEquals('http://localhost/index.php', (string) $request);
+	}
 
-        $this->assertEquals("http://localhost/index.php", (String) $request);
+	public function testToStringWithParameters(): void
+	{
+		$request = new OauthRequest('GET', 'http://localhost/index.php', ['a' => '123', 'q' => 'as', 'c' => '321']);
 
-    }
+		$this->assertEquals('http://localhost/index.php?a=123&c=321&q=as', (string) $request);
+	}
 
-    public function testToStringWithParameters()
-    {
-        $request = new OauthRequest("GET", "http://localhost/index.php", array('a' => '123', 'q' => "as", 'c' => '321'));
+	public function testCreateFromRequest(): void
+	{
+		$request = $this->getRequest();
 
-        $this->assertEquals("http://localhost/index.php?a=123&c=321&q=as", (String) $request);
+		$this->assertEquals(new OauthRequest('GET', 'http://localhost/index.php'), $request);
+	}
 
-    }
+	public function testCreateFromRequestPost(): void
+	{
+		$request = OauthRequest::createFromRequest(SymfonyRequest::create('/index.php', 'POST', [], [], [], [], 'data=lotsofdata&action=doit'));
 
-    public function testCreateFromRequest()
-    {
-        $request = $this->getRequest();
+		$this->assertEquals(new OauthRequest('POST', 'http://localhost/index.php', ['data' => 'lotsofdata', 'action' => 'doit']), $request);
+		$this->assertEquals('lotsofdata', $request->getParameter('data'));
+		$this->assertEquals('doit', $request->getParameter('action'));
+	}
 
-        $this->assertEquals(new OauthRequest('GET', 'http://localhost/index.php'), $request);
-    }
+	public function testCreateFromConsumerAndToken()
+	{
+		$consumer = new Consumer(['key' => 'key', 'secret' => 'secret']);
 
-    public function testCreateFromRequestPost()
-    {
-        $request = OauthRequest::createFromRequest(SymfonyRequest::create('/index.php', 'POST', array(), array(), array(), array(), "data=lotsofdata&action=doit"));
+		$request = OauthRequest::createFromConsumerAndToken($consumer, 'GET', 'http://localhost/index.php');
 
-        $this->assertEquals(new OauthRequest('POST', 'http://localhost/index.php', array('data' => 'lotsofdata', 'action' => 'doit')), $request);
-        $this->assertEquals('lotsofdata', $request->getParameter('data'));
-        $this->assertEquals('doit', $request->getParameter('action'));
+		$this->assertEquals('key', $request->getParameter('oauth_consumer_key'));
+		$this->assertEquals(OauthRequest::$version, $request->getParameter('oauth_version'));
+		$this->assertTrue(null != $request->getParameter('oauth_nonce'));
+		$this->assertTrue(is_int($request->getParameter('oauth_timestamp')));
+		$this->assertTrue(null != $request->getParameter('oauth_timestamp'));
 
-    }
+		return $request;
+	}
 
-    public function testCreateFromConsumerAndToken()
-    {
-        $consumer = new JoakimKejser\OAuth\Consumer('key', 'secret');
+	public function testCreateWithAuthorizationHeader(): void
+	{
+		$consumer = new Consumer(['key' => 'key', 'secret' => 'secret']);
 
-        $request = OauthRequest::createFromConsumerAndToken($consumer, 'GET', 'http://localhost/index.php');
+		$request = OauthRequest::createFromConsumerAndToken($consumer, 'GET', 'http://localhost/index.php', null, ['foo' => 'bar']);
 
-        $this->assertEquals('key', $request->getParameter('oauth_consumer_key'));
-        $this->assertEquals(OauthRequest::$version, $request->getParameter('oauth_version'));
-        $this->assertTrue($request->getParameter('oauth_nonce') != null);
-        $this->assertTrue(is_int($request->getParameter('oauth_timestamp')));
-        $this->assertTrue($request->getParameter('oauth_timestamp') != null);
+		$request->sign(new JoakimKejser\OAuth\SignatureMethod\HmacSha1(), $consumer, null);
 
-        return $request;
-    }
+		// Strip the Authorization part as we will be providing the header directly to the OauthRequest as HTTP_AUTHORIZATION
+		$authHeader = str_replace('Authorization: ', '', $request->toHeader());
 
-    public function testCreateWithAuthorizationHeader()
-    {
+		$server = ['HTTP_AUTHORIZATION' => $authHeader];
 
-        $consumer = new JoakimKejser\OAuth\Consumer('key', 'secret');
+		$sRequest = SymfonyRequest::create('/index.php', 'POST', [], [], [], $server);
 
-        $request = OauthRequest::createFromConsumerAndToken($consumer, 'GET', 'http://localhost/index.php', null, array('foo' => 'bar'));
+		$request2 = OauthRequest::createFromRequest($sRequest);
 
-        $request->sign(new JoakimKejser\OAuth\SignatureMethod\HmacSha1, $consumer, null);
+		$this->assertNotNull($request2->getParameter('oauth_signature'));
+		$this->assertNotNull($request2->getParameter('oauth_version'));
+		$this->assertNotNull($request2->getParameter('oauth_consumer_key'));
+		$this->assertNotNull($request2->getParameter('oauth_timestamp'));
+		$this->assertNotNull($request2->getParameter('oauth_nonce'));
+		$this->assertNotNull($request2->getParameter('oauth_signature_method'));
 
-        // Strip the Authorization part as we will be providing the header directly to the OauthRequest as HTTP_AUTHORIZATION
-        $authHeader = str_replace('Authorization: ', '', $request->toHeader());
+		$this->assertNull($request2->getParameter('oauth_token'));
+	}
 
-        $server = array('HTTP_AUTHORIZATION' => $authHeader);
+	/**
+	 * @depends testCreateFromConsumerAndToken
+	 */
+	public function testToHeaderWithRealm(OauthRequest $request): void
+	{
+		$this->assertEquals('realm="testRealm"', substr($request->toHeader('testRealm'), 21, 17));
+	}
 
-        $sRequest = SymfonyRequest::create('/index.php', 'POST', array(), array(), array(), $server);
+	/**
+	 * @depends testCreateFromConsumerAndToken
+	 */
+	public function testSigningRequest(OauthRequest $request): void
+	{
+		$signatureMethod = new JoakimKejser\OAuth\SignatureMethod\HmacSha1();
 
-        $request2 = OauthRequest::createFromRequest($sRequest);
+		$consumer = new Consumer(['key' => 'key', 'secret' => 'secret']);
 
-        $this->assertNotNull($request2->getParameter('oauth_signature'));
-        $this->assertNotNull($request2->getParameter('oauth_version'));
-        $this->assertNotNull($request2->getParameter('oauth_consumer_key'));
-        $this->assertNotNull($request2->getParameter('oauth_timestamp'));
-        $this->assertNotNull($request2->getParameter('oauth_nonce'));
-        $this->assertNotNull($request2->getParameter('oauth_signature_method'));
+		$this->assertNull($request->getParameter('oauth_signature'));
+		$this->assertNull($request->getParameter('oauth_signature_method'));
 
-        $this->assertNull($request2->getParameter('oauth_token'));
-    }
+		$request->sign($signatureMethod, $consumer);
 
-    /**
-     * @depends testCreateFromConsumerAndToken
-     **/
-    public function testToHeaderWithRealm(OauthRequest $request)
-    {
-        $this->assertEquals('realm="testRealm"', substr($request->toHeader('testRealm'), 21, 17));
-    }
+		$oldSig = $request->getParameter('oauth_signature');
 
-    /**
-     * @depends testCreateFromConsumerAndToken
-     **/
-    public function testSigningRequest(OauthRequest $request)
-    {
-        $signatureMethod = new JoakimKejser\OAuth\SignatureMethod\HmacSha1;
+		$this->assertEquals('HMAC-SHA1', $request->getParameter('oauth_signature_method'));
+		$this->assertEquals(28, strlen($request->getParameter('oauth_signature')));
 
-        $consumer = new JoakimKejser\OAuth\Consumer('key', 'secret');
+		$request->sign($signatureMethod, $consumer);
 
-        $this->assertNull($request->getParameter('oauth_signature'));
-        $this->assertNull($request->getParameter('oauth_signature_method'));
+		$this->assertEquals($oldSig, $request->getParameter('oauth_signature'));
+	}
 
-        $request->sign($signatureMethod, $consumer);
+	/**
+	 * @depends testCreateFromConsumerAndToken
+	 */
+	public function testArraysInParameters(OauthRequest $request): void
+	{
+		$request->setParameter('oauth_signature', [$request->getParameter('oauth_signature')]);
 
-        $oldSig = $request->getParameter('oauth_signature');
+		try {
+			$request->toHeader();
+		} catch (JoakimKejser\OAuth\Exception $e) {
+			$this->assertTrue($e instanceof JoakimKejser\OAuth\Exception\ArrayNotSupportedInHeadersException);
+		}
+	}
 
-        $this->assertEquals('HMAC-SHA1', $request->getParameter('oauth_signature_method'));
-        $this->assertEquals(28, strlen($request->getParameter('oauth_signature')));
+	public function testCreateFromConsumerAndTokenWithToken(): void
+	{
+		$token = new JoakimKejser\OAuth\AccessToken('tokenkey', 'tokensecret');
+		$consumer = new Consumer(['key' => 'key', 'secret' => 'secret']);
+		$request = OauthRequest::createFromConsumerAndToken($consumer, 'GET', 'http://localhost/index.php', $token, ['foo' => 'bar']);
 
-        $request->sign($signatureMethod, $consumer);
+		$this->assertEquals('tokenkey', $request->getParameter('oauth_token'));
+	}
 
-        $this->assertEquals($oldSig, $request->getParameter('oauth_signature'));
+	public function testCreateFromGlobals(): void
+	{
+		$_SERVER = [
+			'HTTP_HOST' => 'localhost',
+			'SERVER_PORT' => 80,
+			'REQUEST_METHOD' => 'GET',
+			'REQUEST_URI' => '/index.php'
+		];
 
-    }
+		$request = OauthRequest::createFromGlobals();
 
-    /**
-     * @depends testCreateFromConsumerAndToken
-     **/
-    public function testArraysInParameters(OauthRequest $request)
-    {
-        $request->setParameter('oauth_signature', array($request->getParameter('oauth_signature')));
+		$this->assertEquals(new OauthRequest('GET', 'http://localhost/index.php'), $request);
+	}
 
-        try {
-            $request->toHeader();
-        } catch (JoakimKejser\OAuth\Exception $e) {
-            $this->assertTrue($e instanceOf JoakimKejser\OAuth\Exception\ArrayNotSupportedInHeaders);
-        }
-    }
+	public function testGetNormalizedUri(): void
+	{
+		$symfonyRequest = SymfonyRequest::create('http://localhost:80/index.php', 'GET');
+		$request = OauthRequest::createFromRequest($symfonyRequest);
 
-    public function testCreateFromConsumerAndTokenWithToken()
-    {
-        $token = new JoakimKejser\OAuth\Token('tokenkey', 'tokensecret');
-        $consumer = new JoakimKejser\OAuth\Consumer('key', 'secret');
-        $request = OauthRequest::createFromConsumerAndToken($consumer, 'GET', 'http://localhost/index.php', $token, array('foo' => 'bar'));
+		$url = $request->getNormalizedHttpUrl();
 
-        $this->assertEquals('tokenkey', $request->getParameter('oauth_token'));
-    }
+		$this->assertEquals('http://localhost/index.php', $url);
 
-    public function testCreateFromGlobals()
-    {
-        $_SERVER = array(
-            'HTTP_HOST' => 'localhost',
-            'SERVER_PORT' => 80,
-            'REQUEST_METHOD' => 'GET',
-            'REQUEST_URI' => '/index.php'
-        );
+		$symfonyRequest = SymfonyRequest::create('http://localhost:8080/index.php', 'GET');
+		$request = OauthRequest::createFromRequest($symfonyRequest);
 
-        $request = OauthRequest::createFromGlobals();
+		$url = $request->getNormalizedHttpUrl();
 
-        $this->assertEquals(new OauthRequest('GET', 'http://localhost/index.php'), $request);
-    }
+		$this->assertEquals('http://localhost:8080/index.php', $url);
+	}
 
-    public function testGetNormalizedUri()
-    {   
-        $symfonyRequest = SymfonyRequest::create('http://localhost:80/index.php', 'GET');
-        $request = OauthRequest::createFromRequest($symfonyRequest);
+	public function testUnsetParameter(): void
+	{
+		$request = $this->getRequest();
 
-        $url = $request->getNormalizedHttpUrl();
+		$request->setParameter('foo', 'bar');
 
-        $this->assertEquals('http://localhost/index.php', $url);
+		$this->assertEquals($request->getParameter('foo'), 'bar');
 
-        $symfonyRequest = SymfonyRequest::create('http://localhost:8080/index.php', 'GET');
-        $request = OauthRequest::createFromRequest($symfonyRequest);
+		$request->unsetParameter('foo');
 
-        $url = $request->getNormalizedHttpUrl();
+		$this->assertEquals($request->getParameter('foo'), null);
+	}
 
-        $this->assertEquals('http://localhost:8080/index.php', $url);
-    }
+	public function testSetParameter(): void
+	{
+		$request = $this->getRequest();
 
-    public function testUnsetParameter()
-    {
-        $request = $this->getRequest();
+		$request->setParameter('foo', 'bar');
 
-        $request->setParameter('foo','bar');
+		$this->assertEquals($request->getParameter('foo'), 'bar');
 
-        $this->assertEquals($request->getParameter('foo'), 'bar');
+		$request->setParameter('foo', 'baz', true);
 
-        $request->unsetParameter('foo');
+		$this->assertEquals($request->getParameter('foo'), ['bar', 'baz']);
+	}
 
-        $this->assertEquals($request->getParameter('foo'), null);
-    }
+	public function testToPostDataNoOAuth(): void
+	{
+		$consumer = new Consumer(['key' => 'key', 'secret' => 'secret']);
 
-    public function testSetParameter()
-    {
-        $request = $this->getRequest();
+		$request = OauthRequest::createFromConsumerAndToken($consumer, 'POST', 'http://localhost/index.php', null, ['foo' => 'bar']);
 
-        $request->setParameter('foo', 'bar');
+		$request->sign(new JoakimKejser\OAuth\SignatureMethod\HmacSha1(), $consumer, null);
 
-        $this->assertEquals($request->getParameter('foo'), 'bar');
+		$postDataParameters = JoakimKejser\OAuth\Util::parseParameters($request->toPostData(true));
 
-        $request->setParameter('foo', 'baz', true);
+		$this->assertFalse(array_key_exists('oauth_signature', $postDataParameters));
+		$this->assertTrue(array_key_exists('foo', $postDataParameters));
+	}
 
-        $this->assertEquals($request->getParameter('foo'), array('bar', 'baz'));
-    }
+	protected function getRequest($httpMethod = null, $httpUrl = null, $parameters = null)
+	{
+		return OauthRequest::createFromRequest(SymfonyRequest::create('/index.php', 'GET'));
+	}
+}
 
-    public function testToPostDataNoOAuth()
-    {
-        $consumer = new JoakimKejser\OAuth\Consumer('key', 'secret');
+if (!class_exists('Consumer')) {
+	class Consumer implements ConsumerInterface
+	{
+		protected $data;
 
-        $request = OauthRequest::createFromConsumerAndToken($consumer, 'POST', 'http://localhost/index.php', null, array('foo' => 'bar'));
+		public function __construct(array $data)
+		{
+			$this->data = $data;
+		}
 
-        $request->sign(new JoakimKejser\OAuth\SignatureMethod\HmacSha1, $consumer, null);
+		public function getValue($field)
+		{
+			if (isset($this->data[$field])) {
+				return $this->data[$field];
+			}
 
-        $postDataParameters = JoakimKejser\OAuth\Util::parseParameters($request->toPostData(true));
+			return null;
+		}
 
-        $this->assertFalse(array_key_exists('oauth_signature', $postDataParameters));
-        $this->assertTrue(array_key_exists('foo', $postDataParameters));
+		public function getKey()
+		{
+			return $this->getValue('key');
+		}
 
-    }
-
-    protected function getRequest($httpMethod = null, $httpUrl = null, $parameters = null)
-    {
-        return OauthRequest::createFromRequest(SymfonyRequest::create('/index.php', 'GET'));
-    }
+		public function getSecret()
+		{
+			return $this->getValue('secret');
+		}
+	}
 }
