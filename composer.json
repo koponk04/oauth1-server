@@ -11,16 +11,15 @@
     }
   ],
   "require": {
-    "php": ">=5.4",
-    "symfony/http-foundation": "2.6.*"
+    "php": ">=7.2",
+    "symfony/http-foundation": "5.*"
   },
   "require-dev": {
-    "phpunit/phpunit": "~4.0",
+    "phpunit/phpunit": "8.*",
     "squizlabs/php_codesniffer": "*",
     "sebastian/phpcpd": "*",
-    "phpmd/phpmd": "@stable",
-    "pdepend/pdepend": "2.1.0",
-    "mayflower/php-codebrowser": "~1.1"
+    "phpmd/phpmd": "2.7.*",
+    "mayflower/php-codebrowser": "2.*"
   },
   "autoload": {
     "psr-0": {"JoakimKejser\\OAuth": "src/"}
